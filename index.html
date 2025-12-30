@@ -652,6 +652,8 @@
         async function handleSubmit(event) {
             event.preventDefault();
 
+            // 获取表单元素（修复 form is not defined 错误）
+            const form = document.getElementById('surveyForm');
             const submitBtn = document.querySelector('.submit-btn');
             const originalText = submitBtn.textContent;
 
