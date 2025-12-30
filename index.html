@@ -681,24 +681,28 @@
                 const userAgent = navigator.userAgent;
 
                 // 准备提交数据 - 确保user_id可以为null（匿名用户）
+                // 确保 issues 是数组格式，即使为空也要是空数组
                 const surveyData = {
                     user_id: userId || null,  // 明确设置为null如果未登录
                     role: formData.role,
-                    issues: formData.issues.length > 0 ? formData.issues : null,
-                    usability_rating: formData.usability_rating,
-                    error_handling_rating: formData.error_handling_rating,
-                    dashboard_rating: formData.dashboard_rating,
-                    quality_rating: formData.quality_rating,
-                    overall_rating: formData.overall_rating,
-                    dissatisfaction: formData.dissatisfaction,
-                    suggestion: formData.suggestion,
-                    ip_address: ipAddress,
-                    user_agent: userAgent
+                    issues: formData.issues && formData.issues.length > 0 ? formData.issues : [],  // 空数组而不是null
+                    usability_rating: formData.usability_rating || null,
+                    error_handling_rating: formData.error_handling_rating || null,
+                    dashboard_rating: formData.dashboard_rating || null,
+                    quality_rating: formData.quality_rating || null,
+                    overall_rating: formData.overall_rating,  // 必填项
+                    dissatisfaction: formData.dissatisfaction || null,
+                    suggestion: formData.suggestion || null,
+                    ip_address: ipAddress || null,
+                    user_agent: userAgent || null
                 };
 
-                console.log('准备提交的数据:', surveyData);
+                console.log('准备提交的数据:', JSON.stringify(surveyData, null, 2));
+                console.log('Supabase URL:', SUPABASE_URL);
+                console.log('当前用户ID:', userId);
 
                 // 提交到 Supabase - 使用匿名客户端
+                console.log('开始提交到 Supabase...');
                 const { data, error } = await supabase
                     .from('user_feedback_surveys')
                     .insert([surveyData])
@@ -706,6 +710,7 @@
 
                 if (error) {
                     console.error('提交失败:', error);
+                    console.error('完整错误对象:', JSON.stringify(error, null, 2));
                     console.error('错误详情:', {
                         message: error.message,
                         details: error.details,
@@ -713,15 +718,22 @@
                         code: error.code
                     });
                     
-                    // 更友好的错误提示
+                    // 更详细的错误提示
                     let errorMsg = '提交失败：';
-                    if (error.message && error.message.includes('row-level security')) {
-                        errorMsg += '权限验证失败，请刷新页面后重试。如果问题持续，请联系技术支持。';
-                    } else if (error.message && error.message.includes('violates')) {
-                        errorMsg += '数据验证失败，请检查填写内容后重试。';
+                    if (error.message) {
+                        if (error.message.includes('row-level security') || error.message.includes('RLS')) {
+                            errorMsg += '权限验证失败。策略已配置为允许匿名用户，请刷新页面后重试。';
+                        } else if (error.message.includes('violates')) {
+                            errorMsg += '数据验证失败：' + error.message;
+                        } else {
+                            errorMsg += error.message;
+                        }
                     } else {
-                        errorMsg += error.message || '网络错误，请稍后重试';
+                        errorMsg += '网络错误，请稍后重试';
                     }
+                    
+                    // 在控制台显示完整错误信息以便调试
+                    console.error('错误信息:', errorMsg);
                     
                     showMessage(errorMsg, 'error');
                     submitBtn.disabled = false;
