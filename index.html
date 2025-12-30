@@ -543,11 +543,17 @@
         const SUPABASE_URL = 'https://plsibdmbgfnnlkmggkxk.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsc2liZG1iZ2ZubmxrbWdna3hrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzNzEyOTMsImV4cCI6MjA3Njk0NzI5M30.ic0LNhWSYPRxRZJrs8CTcu0KZvg8Npy4zmj-HMD9jSo';
         
-        // 初始化 Supabase 客户端 - 使用匿名模式
+        // 初始化 Supabase 客户端 - 完全匿名模式，不进行任何认证检查
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: {
-                persistSession: false,  // 匿名用户不需要持久化session
-                autoRefreshToken: false
+                persistSession: false,
+                autoRefreshToken: false,
+                detectSessionInUrl: false
+            },
+            global: {
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY
+                }
             }
         });
 
@@ -567,18 +573,13 @@
         }
 
         // 获取当前用户（如果已登录）
+        // 注意：对于匿名提交，我们直接返回 null，不尝试获取用户信息
+        // 这样可以避免 403 错误
         async function getCurrentUser() {
-            try {
-                const { data: { user }, error } = await supabase.auth.getUser();
-                if (error) {
-                    console.log('未登录用户，将以匿名方式提交');
-                    return null;
-                }
-                return user ? user.id : null;
-            } catch (error) {
-                console.log('未登录用户，将以匿名方式提交');
-                return null;
-            }
+            // 直接返回 null，以匿名方式提交
+            // 不调用 supabase.auth.getUser() 避免 403 错误
+            console.log('匿名用户，将以匿名方式提交');
+            return null;
         }
 
         // 获取 IP 地址（简化版，实际应该通过后端获取）
@@ -673,7 +674,7 @@
                     return;
                 }
 
-                // 获取用户ID（如果已登录）
+                // 获取用户ID（匿名用户直接返回 null，不调用 API）
                 const userId = await getCurrentUser();
 
                 // 获取 IP 地址和 User Agent
@@ -683,7 +684,7 @@
                 // 准备提交数据 - 确保user_id可以为null（匿名用户）
                 // 确保 issues 是数组格式，即使为空也要是空数组
                 const surveyData = {
-                    user_id: userId || null,  // 明确设置为null如果未登录
+                    user_id: null,  // 匿名用户，明确设置为 null
                     role: formData.role,
                     issues: formData.issues && formData.issues.length > 0 ? formData.issues : [],  // 空数组而不是null
                     usability_rating: formData.usability_rating || null,
@@ -699,9 +700,9 @@
 
                 console.log('准备提交的数据:', JSON.stringify(surveyData, null, 2));
                 console.log('Supabase URL:', SUPABASE_URL);
-                console.log('当前用户ID:', userId);
+                console.log('匿名模式提交');
 
-                // 提交到 Supabase - 使用匿名客户端
+                // 提交到 Supabase - 使用匿名客户端，不进行任何认证
                 console.log('开始提交到 Supabase...');
                 const { data, error } = await supabase
                     .from('user_feedback_surveys')
@@ -771,14 +772,8 @@
             const form = document.getElementById('surveyForm');
             form.addEventListener('submit', handleSubmit);
 
-            // 检查是否已登录（可选：显示登录状态）
-            getCurrentUser().then(userId => {
-                if (userId) {
-                    console.log('已登录用户，将关联用户ID:', userId);
-                } else {
-                    console.log('匿名用户，将以匿名方式提交');
-                }
-            });
+            // 匿名用户模式，不检查登录状态
+            console.log('问卷系统已加载，匿名用户模式');
         });
     </script>
 
