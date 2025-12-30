@@ -543,8 +543,13 @@
         const SUPABASE_URL = 'https://ryycsolimgocffujpunq.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5eWNzb2xpbWdvY2ZmdWpwdW5xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA3NzkzMjgsImV4cCI6MjA3NjM1NTMyOH0.pj55LwIA4kasv4SlG66W6QFqVVUdlEWIFyOlOW2mKbA';
         
-        // 初始化 Supabase 客户端
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // 初始化 Supabase 客户端 - 使用匿名模式
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: {
+                persistSession: false,  // 匿名用户不需要持久化session
+                autoRefreshToken: false
+            }
+        });
 
         // 显示提示消息
         function showMessage(text, type = 'success') {
@@ -564,7 +569,11 @@
         // 获取当前用户（如果已登录）
         async function getCurrentUser() {
             try {
-                const { data: { user } } = await supabase.auth.getUser();
+                const { data: { user }, error } = await supabase.auth.getUser();
+                if (error) {
+                    console.log('未登录用户，将以匿名方式提交');
+                    return null;
+                }
                 return user ? user.id : null;
             } catch (error) {
                 console.log('未登录用户，将以匿名方式提交');
@@ -671,11 +680,11 @@
                 const ipAddress = await getIPAddress();
                 const userAgent = navigator.userAgent;
 
-                // 准备提交数据
+                // 准备提交数据 - 确保user_id可以为null（匿名用户）
                 const surveyData = {
-                    user_id: userId,
+                    user_id: userId || null,  // 明确设置为null如果未登录
                     role: formData.role,
-                    issues: formData.issues,
+                    issues: formData.issues.length > 0 ? formData.issues : null,
                     usability_rating: formData.usability_rating,
                     error_handling_rating: formData.error_handling_rating,
                     dashboard_rating: formData.dashboard_rating,
@@ -687,7 +696,9 @@
                     user_agent: userAgent
                 };
 
-                // 提交到 Supabase
+                console.log('准备提交的数据:', surveyData);
+
+                // 提交到 Supabase - 使用匿名客户端
                 const { data, error } = await supabase
                     .from('user_feedback_surveys')
                     .insert([surveyData])
@@ -695,12 +706,30 @@
 
                 if (error) {
                     console.error('提交失败:', error);
-                    showMessage('提交失败：' + (error.message || '网络错误，请稍后重试'), 'error');
+                    console.error('错误详情:', {
+                        message: error.message,
+                        details: error.details,
+                        hint: error.hint,
+                        code: error.code
+                    });
+                    
+                    // 更友好的错误提示
+                    let errorMsg = '提交失败：';
+                    if (error.message && error.message.includes('row-level security')) {
+                        errorMsg += '权限验证失败，请刷新页面后重试。如果问题持续，请联系技术支持。';
+                    } else if (error.message && error.message.includes('violates')) {
+                        errorMsg += '数据验证失败，请检查填写内容后重试。';
+                    } else {
+                        errorMsg += error.message || '网络错误，请稍后重试';
+                    }
+                    
+                    showMessage(errorMsg, 'error');
                     submitBtn.disabled = false;
                     submitBtn.classList.remove('loading');
                     submitBtn.textContent = originalText;
                 } else {
                     // 提交成功
+                    console.log('提交成功:', data);
                     showMessage('✅ 感谢您的反馈！您的意见对我们非常重要。', 'success');
                     
                     // 清空表单
@@ -733,7 +762,9 @@
             // 检查是否已登录（可选：显示登录状态）
             getCurrentUser().then(userId => {
                 if (userId) {
-                    console.log('已登录用户，将关联用户ID');
+                    console.log('已登录用户，将关联用户ID:', userId);
+                } else {
+                    console.log('匿名用户，将以匿名方式提交');
                 }
             });
         });
