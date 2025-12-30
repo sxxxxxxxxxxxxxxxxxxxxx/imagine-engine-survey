@@ -543,17 +543,11 @@
         const SUPABASE_URL = 'https://plsibdmbgfnnlkmggkxk.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsc2liZG1iZ2ZubmxrbWdna3hrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzNzEyOTMsImV4cCI6MjA3Njk0NzI5M30.ic0LNhWSYPRxRZJrs8CTcu0KZvg8Npy4zmj-HMD9jSo';
         
-        // 初始化 Supabase 客户端 - 完全匿名模式，不进行任何认证检查
+        // 初始化 Supabase 客户端 - 使用匿名模式
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: {
-                persistSession: false,
-                autoRefreshToken: false,
-                detectSessionInUrl: false
-            },
-            global: {
-                headers: {
-                    'apikey': SUPABASE_ANON_KEY
-                }
+                persistSession: false,  // 匿名用户不需要持久化session
+                autoRefreshToken: false
             }
         });
 
@@ -676,7 +670,7 @@
                     return;
                 }
 
-                // 获取用户ID（匿名用户直接返回 null，不调用 API）
+                // 获取用户ID（如果已登录）
                 const userId = await getCurrentUser();
 
                 // 获取 IP 地址和 User Agent
@@ -686,7 +680,7 @@
                 // 准备提交数据 - 确保user_id可以为null（匿名用户）
                 // 确保 issues 是数组格式，即使为空也要是空数组
                 const surveyData = {
-                    user_id: null,  // 匿名用户，明确设置为 null
+                    user_id: userId || null,  // 明确设置为null如果未登录
                     role: formData.role,
                     issues: formData.issues && formData.issues.length > 0 ? formData.issues : [],  // 空数组而不是null
                     usability_rating: formData.usability_rating || null,
@@ -702,9 +696,9 @@
 
                 console.log('准备提交的数据:', JSON.stringify(surveyData, null, 2));
                 console.log('Supabase URL:', SUPABASE_URL);
-                console.log('匿名模式提交');
+                console.log('当前用户ID:', userId);
 
-                // 提交到 Supabase - 使用匿名客户端，不进行任何认证
+                // 提交到 Supabase - 使用匿名客户端
                 console.log('开始提交到 Supabase...');
                 const { data, error } = await supabase
                     .from('user_feedback_surveys')
@@ -744,7 +738,6 @@
                     submitBtn.textContent = originalText;
                 } else {
                     // 提交成功
-                    console.log('提交成功:', data);
                     showMessage('✅ 感谢您的反馈！您的意见对我们非常重要。', 'success');
                     
                     // 清空表单
